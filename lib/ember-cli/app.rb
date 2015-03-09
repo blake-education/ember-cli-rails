@@ -118,14 +118,6 @@ module EmberCLI
       path
     end
 
-    def silence_build(&block)
-      if ENV.fetch("EMBER_CLI_RAILS_VERBOSE"){ !non_production? }
-        yield
-      else
-        silence_stream(STDOUT, &block)
-      end
-    end
-
     def build_timeout
       options.fetch(:build_timeout){ configuration.build_timeout }
     end
@@ -210,11 +202,7 @@ module EmberCLI
 
     def command(options={})
       watch = options[:watch] ? "--watch" : ""
-      "#{ember_path} build #{watch} --environment #{environment} --output-path #{dist_path} #{log_pipe}"
-    end
-
-    def log_pipe
-      "| #{tee_path} -a #{log_path}" if tee_path
+      "#{ember_path} build #{watch} --environment #{environment} --output-path #{dist_path}"
     end
 
     def ember_app_name
