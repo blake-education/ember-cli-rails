@@ -26,6 +26,7 @@ module EmberCLI
     def install_dependencies
       system! "#{bundler_path} install" if gemfile_path.exist?
       system! "#{npm_path} install"
+      system! "#{bower_path} install"
     end
 
     def run
@@ -88,6 +89,15 @@ module EmberCLI
       @ember_path ||= app_path.join("node_modules", ".bin", "ember").tap do |path|
         fail <<-MSG.strip_heredoc unless path.executable?
           No local ember executable found. You should run `npm install`
+          inside the #{name} app located at #{app_path}
+        MSG
+      end
+    end
+
+    def bower_path
+      @bower_path ||= app_path.join("node_modules", ".bin", "bower").tap do |path|
+        fail <<-MSG.strip_heredoc unless path.executable?
+          No local bower executable found. You should run `npm install`
           inside the #{name} app located at #{app_path}
         MSG
       end
