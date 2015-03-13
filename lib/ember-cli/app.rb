@@ -19,25 +19,26 @@ module EmberCLI
 
     def compile
       prepare
-      silence_build { exec command }
+      system! command
       check_for_build_error!
     end
 
     def install_dependencies
-      exec "#{bundler_path} install" if gemfile_path.exist?
-      exec "#{npm_path} install"
+      system! "#{bundler_path} install" if gemfile_path.exist?
+      system! "#{npm_path} install"
+      system! "#{bower_path} install"
     end
 
     def run
       prepare
       cmd = command(watch: true)
-      @pid = exec(cmd, method: :spawn)
+      @pid = spawn cmd
       at_exit{ stop }
     end
 
     def run_tests
       prepare
-      tests_pass = exec("#{ember_path} test")
+      tests_pass = system("#{ember_path} test")
       exit 1 unless tests_pass
     end
 
@@ -93,6 +94,15 @@ module EmberCLI
       end
     end
 
+    def bower_path
+      @bower_path ||= app_path.join("node_modules", ".bin", "bower").tap do |path|
+        fail <<-MSG.strip_heredoc unless path.executable?
+          No local bower executable found. You should run `npm install`
+          inside the #{name} app located at #{app_path}
+        MSG
+      end
+    end
+
     private
 
     delegate :match_version?, :non_production?, to: Helpers
@@ -116,14 +126,6 @@ module EmberCLI
       MSG
 
       path
-    end
-
-    def silence_build(&block)
-      if ENV.fetch("EMBER_CLI_RAILS_VERBOSE"){ !non_production? }
-        yield
-      else
-        silence_stream(STDOUT, &block)
-      end
     end
 
     def build_timeout
@@ -210,11 +212,7 @@ module EmberCLI
 
     def command(options={})
       watch = options[:watch] ? "--watch" : ""
-      "#{ember_path} build #{watch} --environment #{environment} --output-path #{dist_path} #{log_pipe}"
-    end
-
-    def log_pipe
-      "| #{tee_path} -a #{log_path}" if tee_path
+      "#{ember_path} build #{watch} --environment #{environment} --output-path #{dist_path}"
     end
 
     def ember_app_name
@@ -278,11 +276,23 @@ module EmberCLI
       app_path.join("Gemfile")
     end
 
-    def exec(cmd, options={})
-      method_name = options.fetch(:method, :system)
+    def in_app_path(&blk)
+      Dir.chdir(app_path, &blk)
+    end
 
-      Dir.chdir app_path do
-        Kernel.public_send(method_name, env_hash, cmd, err: :out)
+    def system(cmd, options={})
+      in_app_path do
+        Kernel.system(env_hash, cmd, err: :out)
+      end
+    end
+
+    def system!(cmd, options={})
+      system(cmd, options) || raise("command failed cmd=#{cmd}, exit=(#{$?})")
+    end
+
+    def spawn(cmd, options={})
+      in_app_path do
+        Kernel.spawn(env_hash, cmd, err: :out)
       end
     end
 
